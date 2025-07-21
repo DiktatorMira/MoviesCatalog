@@ -1,0 +1,13 @@
+$breakpoints: (
+    xs: 0px,      // Extra small (mobile, минимальный размер)
+    sm: 576px,    // Small (mobile)
+    md: 768px,    // Medium (tablet)
+    lg: 992px,    // Large (desktop)
+    xl: 1200px,   // Extra large (large desktop)
+    xxl: 1400px   // Extra extra large (ultra-wide)
+) !default;
+$text: #dcdcdc;
+$body-background: #282828;
+$elements-background: #343434;
+$button: #1d51a3;
+$button-disabled: #5b5b5b;

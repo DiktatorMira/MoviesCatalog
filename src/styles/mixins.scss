@@ -1,0 +1,28 @@
+@use "variables.scss" as *;
+
+@mixin media-breakpoint-between($lower, $upper) {
+    $min: if(type-of($lower) == 'number', $lower, map-get($breakpoints, $lower));
+    $max: if(type-of($upper) == 'number', $upper, map-get($breakpoints, $upper));
+
+    @if $min != null and $max != null {
+        @media (min-width: #{$min}px) and (max-width: #{$max - 1}px) { @content; }
+    } @else {
+        @error "❌ Error! One of the breakpoints `#{$lower}` or `#{$upper}` was not found and is not a number.";
+    }
+}
+@mixin media-breakpoint-down($breakpoint) {
+    $value: if(type-of($breakpoint) == 'number', $breakpoint, map-get($breakpoints, $breakpoint));
+    @if $value != null {
+        @media (max-width: #{$value - 1}px) { @content; }
+    } @else {
+        @error "❌ Error! Breakpoint `#{$breakpoint}` not found and not a number.";
+    }
+}
+@mixin media-breakpoint-up($breakpoint) {
+    $value: if(type-of($breakpoint) == 'number', $breakpoint, map-get($breakpoints, $breakpoint));
+    @if $value != null {
+        @media (min-width: #{$value}px) { @content; }
+    } @else {
+        @error "❌ Error! Breakpoint `#{$breakpoint}` not found and not a number.";
+    }
+}
