@@ -1,6 +1,5 @@
-@use "variables.scss" as *;
-
 :root {
+  background: $body-background;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
@@ -8,14 +7,24 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: $body-background;
   color: $text;
+}
+#root{
+  display: flex;
+  height: 100%;
 }
 body {
   margin: 0;
   padding:0;
   box-sizing:border-box;
   -webkit-user-drag:none;
-  place-items: center;
   user-select:none;
+}
+input[type="number"] {
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  -moz-appearance: textfield;
 }

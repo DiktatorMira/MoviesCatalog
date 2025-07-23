@@ -1,0 +1,16 @@
+button {
+    height: 2.25rem;
+    width: 7rem;
+    background: $button;
+    border: none;
+    border-radius: .4rem;
+    color: $text;
+    font-weight: bold;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: .2s;
+
+    &:hover { box-shadow: .2rem .2rem .5rem rgba(86, 86, 86, 0.3); }
+    &:active { transform: scale(0.95); }
+    &:disabled { background: $button-disabled; }
+}

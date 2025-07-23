@@ -9,4 +9,14 @@ export default defineConfig({ // https://vite.dev/config/
       '@': path.resolve(__dirname, './src'),
     },
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        additionalData: `
+          @use "@/assets/variables.scss" as *;
+          @use "@/assets/mixins.scss" as *;
+        `,
+      },
+    },
+  },
 })
