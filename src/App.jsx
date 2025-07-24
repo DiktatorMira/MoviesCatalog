@@ -1,32 +1,52 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchMovies, createSession, searchByTitle, searchByActor, sortMovies, clearSearchResults } from '@/features/movies/moviesSlice';
+import { fetchMovies, createSession, searchByTitle, searchByActor, sortMovies, clearSearchResults, fetchMovieById, importMovies } from '@/features/movies/moviesSlice';
 import Form from './components/form/form.component';
 import ModalWindow from './components/window/window.component';
+import MoreInfoWindow from './components/more-info/more-info.comonent';
 import Button from './components/button/button.component';
 import './app.scss';
 
 export default function App() {
-  // Ініціалізація диспетчера для виклику Redux-екшенів
   const dispatch = useDispatch();
-  // Витягуємо дані зі стану Redux: список фільмів, статус завантаження, помилки, токен, результати пошуку
-  const { items: movies, loading, error, token, searchResults = [] } = useSelector((state) => state.movies);
-  // Створюємо стани для управління інтерфейсом
+  const { items: movies, loading, error, token, searchResults = [] } = useSelector((state) => state.movies); // Витягуємо дані зі стану Redux
   const [isModalWindowVisible, setIsModalWindowVisible] = useState(false); // Видимість модального вікна
+  const [isMoreInfoWindowVisible, setIsMoreInfoWindowVisible] = useState(false); // Видимість окна з більше інформації
   const [isFormVisible, setIsFormVisible] = useState(false); // Видимість форми
   const [formTitle, setFormTitle] = useState(''); // Заголовок форми
-  const [authCredentials, setAuthCredentials] = useState({
+  const [editingMovie, setEditingMovie] = useState(null); // Фільм для редагування
+  const [authCredentials, setAuthCredentials] = useState({ // Дані для автентифікації
     email: '',
     password: '',
-  }); // Дані для автентифікації
+  });
   const [authError, setAuthError] = useState(''); // Помилка автентифікації
   const [isAuthenticating, setIsAuthenticating] = useState(false); // Статус процесу автентифікації
   const [showAuthForm, setShowAuthForm] = useState(false); // Показ форми автентифікації
   const [isSearching, setIsSearching] = useState(false); // Чи активний режим пошуку
   const [hasFetched, setHasFetched] = useState(false); // Чи були завантажені фільми
-  // Вибираємо, які фільми показувати: результати пошуку чи повний список
-  const displayMovies = isSearching ? searchResults : movies;
+  const [movieToDelete, setMovieToDelete] = useState(null); // ID фільму для видалення
+  const [importError, setImportError] = useState(''); // Помилка імпорту файлу
+  const fileInputRef = useRef(null); // Референс для input file
+  const displayMovies = isSearching ? searchResults : movies; // Вибираємо, які фільми показувати: результати пошуку чи повний список
 
+  const handleImportFile = () => {  // Обробник для виклику вибору файлу
+    fileInputRef.current.click(); // Програмно викликаємо клік на input
+  };
+  const handleFileChange = async (event) => { // Обробник зміни файлу для імпорту
+    const file = event.target.files[0];
+    if (!file) return; // Якщо файл не вибрано, виходимо
+    setImportError(''); // Очищаємо попередні помилки
+    try {
+      await dispatch(importMovies(file)).unwrap(); // Викликаємо екшен для імпорту фільмів
+      alert('Movies successfully imported!'); // Повідомлення про успіх
+    } catch (error) {
+      const errorMessage = 'Failed to import movies. Please check the file format.';
+      setImportError(errorMessage); // Зберігаємо помилку
+      console.error(errorMessage, error);
+      alert('Error importing movies. Check file format.'); // Повідомлення про помилку
+    }
+    fileInputRef.current.value = ''; // Очищаємо input після імпорту
+  };
   const handleManualAuth = async (e) => { // Обробка ручної автентифікації через форму
     e.preventDefault();
     setIsAuthenticating(true); // Починаємо процес автентифікації
@@ -35,7 +55,7 @@ export default function App() {
       await dispatch(createSession(authCredentials)).unwrap(); // Викликаємо екшен для створення сесії
       setShowAuthForm(false); // Ховаємо форму після успішного входу
     } catch (error) {
-      setAuthError('Помилка входу. Перевірте email та пароль.'); // Показуємо помилку
+      setAuthError('Login error. Check your email and password.'); // Показуємо помилку
     } finally {
       setIsAuthenticating(false); // Завершуємо процес автентифікації
     }
@@ -46,14 +66,43 @@ export default function App() {
       [e.target.name]: e.target.value, // Оновлюємо email або пароль
     });
   };
-  const openForm = (title) => {   // Відкриття форми з заданим заголовком
-    setFormTitle(title);
+  const openAddForm = () => { // Відкриття форми для додавання нового фільму
+    setFormTitle('Add movie');
+    setEditingMovie(null); // Очищаємо дані для редагування
+    setIsFormVisible(true);
+  }; 
+  const openEditForm = async (movie) => { // Відкриття форми для редагування існуючого фільму
+    setFormTitle('Edit movie');
+    try {
+      const fullMovieData = await dispatch(fetchMovieById(movie.id)).unwrap(); // Завантажуємо повну інформацію про фільм
+      setEditingMovie(fullMovieData); // Передаємо повні дані фільму для редагування
+    } catch (error) {
+      console.error('Error loading movie data:', error);
+      setEditingMovie(movie); // Використовуємо наявні дані, якщо не вдалося завантажити повні
+    }
     setIsFormVisible(true);
   };
-  const closeForm = () => { setIsFormVisible(false); };
-  const openModalWindow = () => { setIsModalWindowVisible(true); };
-  const closeModalWindow = () => { setIsModalWindowVisible(false); };
-  const handleSortMovies = () => {
+  const closeForm = () => { // Закриття форми
+    setIsFormVisible(false);
+    setEditingMovie(null); // Очищаємо дані редагування
+  };
+  const openModalWindow = (movieId) => { // Відкриття модального вікна для підтвердження видалення
+    setMovieToDelete(movieId); // Зберігаємо ID фільму для видалення
+    setIsModalWindowVisible(true);
+  };
+  const closeModalWindow = () => { // Закриття модального вікна
+    setIsModalWindowVisible(false);
+    setMovieToDelete(null); // Очищаємо ID фільму
+  };
+  const openMoreInfoWindow = (movieId) => { // Відкриття вікна більше інформації
+    setMovieToDelete(movieId); // Зберігаємо ID фільму для видалення
+    setIsMoreInfoWindowVisible(true);
+  };
+  const closeMoreInfoWindow = () => { // Закриття вікна більше інформації
+    setIsMoreInfoWindowVisible(false);
+    setMovieToDelete(null); // Очищаємо ID фільму
+  };
+  const handleSortMovies = () => { // Сортування фільмів
     if (isSearching) {
       setIsSearching(false); // Вимикаємо режим пошуку
       dispatch(clearSearchResults()); // Очищаємо результати пошуку
@@ -70,7 +119,7 @@ export default function App() {
       dispatch(clearSearchResults()); // Очищаємо результати
     }
   };
-  const handleSearchByActor = (event) => {  // Пошук фільмів за актором
+  const handleSearchByActor = (event) => { // Пошук фільмів за актором
     const actor = event.target.value.trim();
     if (actor) {
       setIsSearching(true); // Вмикаємо режим пошуку
@@ -96,14 +145,13 @@ export default function App() {
         if (email && password) {
           const credentials = { email, password };
           await dispatch(createSession(credentials)).unwrap(); // Спроба автоматичного входу
-          console.log('Автентифікація успішна');
         } else {
-          console.log('Немає даних у .env, показуємо форму входу');
+          console.log('No data in .env, showing login form');
           setShowAuthForm(true); // Показуємо форму, якщо немає даних
         }
       } catch (error) {
-        console.error('Помилка автоматичної автентифікації:', error);
-        setAuthError('Автоматичний вхід не вдався. Введіть дані вручну.');
+        console.error('Automatic authentication error:', error);
+        setAuthError('Automatic login failed. Please enter your details manually.');
         setShowAuthForm(true);
       } finally {
         setIsAuthenticating(false); // Завершуємо автентифікацію
@@ -116,7 +164,7 @@ export default function App() {
     return (
       <div className="auth-container">
         <div className="auth-form">
-          <h2>Login the movie catalog</h2>
+          <h2>Enter the movie catalog</h2>
           <form onSubmit={handleManualAuth}>
             <div className="input-group">
               <input
@@ -161,10 +209,15 @@ export default function App() {
     <>
       <aside className="menu">
         <ul className="buttons">
-          <li onClick={() => openForm('Add movie')}>Add movie</li>
-          <li onClick={() => openForm('Edit movie')}>Edit movie</li>
-          <li onClick={() => openModalWindow()}>Delete movie</li>
-          <li>Import from file</li>
+          <li onClick={openAddForm}>Add movie</li>
+          <li onClick={handleImportFile}>Import from file</li>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }} // Приховуємо input для вибору файлу
+            accept=".txt" // Дозволяємо лише текстові файли
+            onChange={handleFileChange} // Обробник вибору файлу
+          />
         </ul>
       </aside>
       <section className="left-section">
@@ -184,8 +237,9 @@ export default function App() {
           />
         </header>
         <ul className="movies-list">
-          {loading && <li>Downloading movies...</li>}
+          {loading && <li>Download movies...</li>}
           {error && <li>Error: {error}</li>}
+          {importError && <li>Помилка імпорту: {importError}</li>}
           {!loading && !error && displayMovies.length === 0 && (
             <li>{isSearching ? 'No movies found!' : 'No movies available!'}</li>
           )}
@@ -195,12 +249,20 @@ export default function App() {
             displayMovies
               .filter((movie) => movie && typeof movie === 'object' && movie.id && movie.title) // Фільтруємо некоректні дані
               .map((movie) => (
-                <li key={movie.id}>{movie.title}</li>
+                <li key={movie.id}>
+                  {movie.title}
+                  <div className="for-buttons">
+                    <Button onClick={() => openMoreInfoWindow(movie.id)}>More info</Button>
+                    <Button onClick={() => openEditForm(movie)}>Edit movie</Button>
+                    <Button onClick={() => openModalWindow(movie.id)}>Delete movie</Button>
+                  </div>
+                </li>
               ))}
         </ul>
       </section>
-      {isFormVisible && <Form title={formTitle} onClose={closeForm} />}
-      {isModalWindowVisible && <ModalWindow onClose={closeModalWindow} />}
+      {isMoreInfoWindowVisible && <MoreInfoWindow onClose={closeMoreInfoWindow} movieId={movieToDelete} />}
+      {isFormVisible && <Form title={formTitle} onClose={closeForm} editingMovie={editingMovie} />}
+      {isModalWindowVisible && <ModalWindow onClose={closeModalWindow} movieId={movieToDelete} />}
     </>
   );
 }

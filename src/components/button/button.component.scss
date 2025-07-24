@@ -10,7 +10,14 @@ button {
     cursor: pointer;
     transition: .2s;
 
-    &:hover { box-shadow: .2rem .2rem .5rem rgba(86, 86, 86, 0.3); }
+    &:hover {
+        background: lighten($button, 4%);
+        box-shadow: .2rem .2rem .5rem rgba(86, 86, 86, 0.4); 
+    }
     &:active { transform: scale(0.95); }
-    &:disabled { background: $button-disabled; }
+    &:disabled {
+        background: $button-disabled; 
+        pointer-events: none;
+        cursor: not-allowed;
+    }
 }

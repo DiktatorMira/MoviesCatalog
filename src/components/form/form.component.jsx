@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addMovie } from '@/features/movies/moviesSlice';
+import { addMovie, editMovie } from '@/features/movies/moviesSlice';
 import Button from '../button/button.component';
 import './form.component.scss';
 
-export default function Form({ title, onClose }) {
+export default function Form({ title, onClose, editingMovie }) {
   const dispatch = useDispatch(); // Ініціалізація диспетчера для виклику Redux-екшенів
   // Отримуємо стан завантаження та помилки з Redux
   const { loading, error } = useSelector((state) => state.movies);
@@ -30,19 +30,23 @@ export default function Form({ title, onClose }) {
         const movieData = { // Формуємо дані для відправки на сервер
           title: formData.title,
           year: parseInt(formData.year, 10),
-          format: formData.format.toLowerCase(), // Приводимо формат до нижнього регістру (напр., 'dvd')
+          format: formData.format, // Не приводимо до нижнього регістру - відправляємо як є
           actors: formData.author.split(',').map((actor) => actor.trim()), // Розбиваємо рядок акторів на масив
         };
-        console.log('Відправка фільму:', movieData);
-        await dispatch(addMovie(movieData)).unwrap(); // Викликаємо екшен для додавання фільму
+  
+        // Якщо редагуємо існуючий фільм
+        if (editingMovie) await dispatch(editMovie({ id: editingMovie.id, movie: movieData })).unwrap();
+        // Якщо додаємо новий фільм
+        else await dispatch(addMovie(movieData)).unwrap();
+
         setFormData({ title: '', year: '', format: '', author: '' }); // Очищаємо форму
         handleClose(); // Закриваємо форму
       } catch (err) {
-        console.error('Помилка addMovie:', err);
+        console.error('Error saving movie:', err);
         const errorMessage =  // Формуємо повідомлення про помилку
           err?.fields && Object.keys(err.fields).length > 0
             ? Object.entries(err.fields).map(([field, message]) => `${field}: ${message}`).join('; ')
-            : err.message || 'Failed to add movie';
+            : err.message || 'Failed to save movie';
         setFormError(errorMessage); // Показуємо помилку користувачу
       }
     }
@@ -55,9 +59,6 @@ export default function Form({ title, onClose }) {
   const handleClose = () => { // Закриття форми з анімацією
     setIsClosing(true);
     setTimeout(() => { onClose(); }, 300); // Затримка для анімації
-  };
-  const handleBackgroundClick = (e) => { // Закриття форми по кліку на фон
-    if (e.target === e.currentTarget) handleClose();
   };
 
   useEffect(() => { setIsClosing(false); }, []); // Ініціалізація стану закриття форми
@@ -78,12 +79,40 @@ export default function Form({ title, onClose }) {
       isYearValid &&
       formData.format !== '' &&
       isAuthorValid;
-
     setIsValid(isFormValid); // Оновлюємо стан валідності
   }, [formData]);
+  useEffect(() => { // Заповнюємо форму даними для редагування
+    if (editingMovie) {
+      let actorsString = ''; // Обробляємо актерів - вони приходять як масив об'єктів з полем name
+      if (editingMovie.actors && Array.isArray(editingMovie.actors)) {
+        // Витягуємо name з об'єкта, або використовуємо сам об'єкт якщо це рядок
+        actorsString = editingMovie.actors.map(actor => actor.name || actor).join(', ');
+      } else if (editingMovie.stars && Array.isArray(editingMovie.stars)) {
+        actorsString = editingMovie.stars.map(actor => actor.name || actor).join(', ');
+      } else if (editingMovie.cast && Array.isArray(editingMovie.cast)) {
+        actorsString = editingMovie.cast.map(actor => actor.name || actor).join(', ');
+      } 
+      else if (typeof editingMovie.actors === 'string') actorsString = editingMovie.actors;
+      else if (typeof editingMovie.stars === 'string') actorsString = editingMovie.stars;
+      
+      setFormData({
+        title: editingMovie.title || '',
+        year: editingMovie.year ? editingMovie.year.toString() : '',
+        format: editingMovie.format || '',
+        author: actorsString, // Використовуємо оброблений рядок акторів
+      });
+    } else {
+      setFormData({ // Очищаємо форму для додавання нового фільму
+        title: '',
+        year: '',
+        format: '',
+        author: '',
+      });
+    }
+  }, [editingMovie]);
 
   return (
-    <div className={`form-background ${isClosing ? 'closing' : ''}`} onClick={handleBackgroundClick}>
+    <div className={`form-background ${isClosing ? 'closing' : ''}`}>
       <form onSubmit={handleSubmit}>
         <h2>{title}</h2>
         <input
@@ -117,7 +146,9 @@ export default function Form({ title, onClose }) {
         {error && <div className="form-error">{error}</div>}
         <div className="for-button">
           <Button type="button" onClick={handleCancel}>Cancel</Button>
-          <Button type="submit" disabled={!isValid || loading}>{loading ? 'Adding...' : 'Apply'}</Button>
+          <Button type="submit" disabled={!isValid || loading}>
+            {loading ? (editingMovie ? 'Saving...' : 'Adding...') : (editingMovie ? 'Save' : 'Apply')}
+          </Button>
         </div>
       </form>
     </div>
