@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  # Backend API сервер
+  api:
+    image: webbylabhub/movies
+    container_name: movies-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  # Frontend додаток
+  frontend:
+    build: .
+    container_name: movies-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - api
+    restart: unless-stopped
+
+networks:
+  default:
+    name: movies-network
